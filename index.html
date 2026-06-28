@@ -61,9 +61,13 @@
   .seat2 .wt{margin-left:auto;color:var(--dim);font-size:.64rem;font-style:italic;font-family:'Noto Sans',sans-serif;text-transform:none}
 
   .sech{font-family:var(--head);font-size:.82rem;text-transform:uppercase;letter-spacing:1.4px;color:var(--cyan);margin:16px 0 9px;font-weight:600}
-  .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-  .team{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:.9rem;transition:.12s}
-  .team .rk{margin-left:auto;font-size:.62rem;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:8px}
+  .team{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:.9rem;transition:.12s}
+  .t-top{display:flex;align-items:center;gap:8px}
+  .t-nm{font-weight:600}
+  .t-top .rk{margin-left:auto;font-size:.62rem;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .t-star{font-size:.74rem;color:#ffd23d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .t-form{font-size:.68rem;color:var(--dim)}
   .team.pick{cursor:pointer}
   .team.pick:hover{border-color:var(--cyan);transform:translateY(-1px);background:var(--panel2)}
   .team.dim{opacity:.35}
@@ -136,6 +140,41 @@ const ISOc={}, RANKc={}, DISPc={};
 TEAMS.forEach(([n,iso,r])=>{ const k=key(n); ISOc[k]=iso; RANKc[k]=r; DISPc[k]=n; });
 const flag = n => ISOc[key(n)] ? `<img class="flag" src="https://flagcdn.com/w40/${ISOc[key(n)]}.png" alt="">` : '';
 const rankOf = n => RANKc[key(n)] || 99;
+/* each team's marquee player (approximate, editable) */
+const STARS={
+ "new zealand":"Chris Wood","jordan":"Mousa Al-Tamari","iran":"Mehdi Taremi","netherlands":"Virgil van Dijk",
+ "brazil":"Vinícius Júnior","england":"Jude Bellingham","australia":"Mathew Ryan","norway":"Erling Haaland",
+ "bosnia":"Edin Džeko","colombia":"Luis Díaz","france":"Kylian Mbappé","switzerland":"Granit Xhaka",
+ "paraguay":"Miguel Almirón","scotland":"Scott McTominay","ivory coast":"Franck Kessié","usa":"Christian Pulisic",
+ "argentina":"Lionel Messi","mexico":"Santiago Giménez","saudi arabia":"Salem Al-Dawsari","ghana":"Mohammed Kudus",
+ "uruguay":"Federico Valverde","ecuador":"Moisés Caicedo","spain":"Lamine Yamal","turkey":"Arda Güler",
+ "uzbekistan":"Eldor Shomurodov","haiti":"Frantzdy Pierrot","panama":"Adalberto Carrasquilla","austria":"David Alaba",
+ "senegal":"Sadio Mané","egypt":"Mohamed Salah","iraq":"Aymen Hussein","congo":"Yoane Wissa",
+ "cape verde":"Ryan Mendes","germany":"Jamal Musiala","japan":"Takefusa Kubo","portugal":"Bruno Fernandes",
+ "curacao":"Leandro Bacuna","czech republic":"Patrik Schick","tunisia":"Hannibal Mejbri","qatar":"Akram Afif",
+ "canada":"Alphonso Davies","korea":"Son Heung-min","sweden":"Alexander Isak","algeria":"Riyad Mahrez",
+ "south africa":"Percy Tau","morocco":"Achraf Hakimi","croatia":"Luka Modrić","belgium":"Kevin De Bruyne"
+};
+const starOf = n => STARS[key(n)] || '';
+/* each team's group-stage form, computed from the live feed */
+let teamForm = {};
+function computeTeamForm(events){
+  const F={}, ens=n=>F[n]=F[n]||{w:0,d:0,l:0,gf:0,ga:0};
+  for(const e of events||[]){
+    if((e.season&&e.season.slug)!=='group-stage') continue;
+    if(((e.status||{}).type||{}).state!=='post') continue;
+    const c=e.competitions[0].competitors;
+    const h=c.find(x=>x.homeAway==='home')||c[0], a=c.find(x=>x.homeAway==='away')||c[1];
+    const hs=+h.score, as=+a.score; if(isNaN(hs)||isNaN(as)) continue;
+    const hn=DISPc[key(h.team.displayName)], an=DISPc[key(a.team.displayName)];
+    if(hn){ ens(hn); F[hn].gf+=hs; F[hn].ga+=as; if(hs>as)F[hn].w++; else if(hs<as)F[hn].l++; else F[hn].d++; }
+    if(an){ ens(an); F[an].gf+=as; F[an].ga+=hs; if(as>hs)F[an].w++; else if(as<hs)F[an].l++; else F[an].d++; }
+  }
+  return F;
+}
+async function loadTeamData(){
+  try{ const j=await (await fetch(ESPN)).json(); teamForm=computeTeamForm(j.events||[]); render(); }catch(e){}
+}
 const TEST_POOL = TEAMS.slice().sort((a,b)=>a[2]-b[2]).slice(0,32).map(t=>({team:t[0],rank:t[2]}));
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=300";
 
@@ -340,8 +379,13 @@ function render(){
   <div class="pool">
     ${pool.slice().sort((a,b)=>a.rank-b.rank).map(t=>{
       const isTaken=taken.has(t.team);
+      const f=teamForm[t.team];
+      const form = f ? `Group ${f.w}W ${f.d}D ${f.l}L · ${f.gf}-${f.ga}` : '';
       return `<div class="team ${myTurn&&!isTaken?'pick':''} ${isTaken?'dim':''}" data-team="${isTaken?'':t.team}">
-        ${flag(t.team)} <span>${t.team}</span><span class="rk">#${t.rank}</span></div>`;
+        <div class="t-top">${flag(t.team)} <span class="t-nm">${t.team}</span><span class="rk">#${t.rank}</span></div>
+        <div class="t-star">⭐ ${starOf(t.team)||'—'}</div>
+        <div class="t-form">${form}</div>
+      </div>`;
     }).join('')}
   </div>`}
 
@@ -428,6 +472,7 @@ setupChannel();
 setInterval(refresh, 3000);          // polling safety net: self-heals any missed realtime event
 setInterval(()=>{ if(state && state.started && picks.length<(state.pool_json||[]).length) render(); }, 1000);  // clock tick
 refresh();                           // draft order is locked (LOCKED_ORDER); no live recompute
+loadTeamData();                      // group-stage form for each team in the pick pool
 </script>
 </body>
 </html>

@@ -138,7 +138,7 @@ const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/sc
 /* ============ state ============ */
 let me = localStorage.getItem("draftMe") || null;
 let state = null, picks = [], seedOrder = [], autopick = true;
-let lastAuto = -1, prevMyTurn = false, online = {};
+let lastAuto = -1, prevMyTurn = false, online = {}, appliedReset = null;
 const myDelay = 1.5 + (Math.abs(hashStr((me||"")+Math.random())) % 16)/10;  // per-device backup jitter 1.5-3.1s
 function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return h; }
 
@@ -149,7 +149,14 @@ async function refresh(){
       sb.from('draft_state').select('*').eq('id',1).single(),
       sb.from('draft_picks').select('*').order('pick_no')
     ]);
-    if(st) state = st;
+    if(st){
+      state = st;
+      const rs = st.reset_seq||0;
+      if(appliedReset===null) appliedReset = rs;                 // first sync: just record it
+      else if(rs!==appliedReset){                                // host hit "restart": everyone re-picks
+        appliedReset = rs; me=null; localStorage.removeItem("draftMe"); prevMyTurn=false; seedOrder=[];
+      }
+    }
     if(pk) picks = pk;
     render();
   }catch(e){ /* keep last known; poll will retry */ }
@@ -216,6 +223,14 @@ async function resetDraft(){
   await sb.from('draft_state').update({ started:false, deadline:null }).eq('id',1);
   lastAuto=-1;
 }
+// full restart: clears picks AND sends every device back to re-select their name
+async function restartLobby(){
+  if(!confirm('Restart from the very beginning? This clears any picks and sends EVERYONE back to re-select their name.')) return;
+  await sb.from('draft_picks').delete().neq('pick_no',-1);
+  await sb.from('draft_state').update({ started:false, deadline:null, reset_seq:Date.now() }).eq('id',1);
+  lastAuto=-1;
+}
+window.restartLobby = restartLobby;
 window.setMe = (p)=>{ me=p; if(p) localStorage.setItem("draftMe",p); else localStorage.removeItem("draftMe"); trackPresence(); render(); };
 window.selectName = (p)=>{
   if(online[p] && p!==me){ if(!confirm(p+" is already selected on another device. Take over and become "+p+"?")) return; }
@@ -286,7 +301,7 @@ function render(){
   }).join('')}</div>
 
   <div class="toggle"><label><input type="checkbox" id="apToggle" ${autopick?'checked':''}> Auto-pick the best available team if the clock runs out</label></div>
-  <div class="bar"><button class="danger-btn" onclick="resetDraft()">↺ Reset draft</button></div>`;
+  <div class="bar"><button class="danger-btn" onclick="resetDraft()">↺ Reset picks (keep names)</button><button class="danger-btn" onclick="restartLobby()">⟲ Restart names</button></div>`;
 
   if(myTurn) app.querySelectorAll('.team.pick').forEach(el=>{ const t=el.dataset.team; if(t) el.onclick=()=>makePick(t); });
   const ap=document.getElementById('apToggle'); if(ap) ap.onchange=()=>{ autopick=ap.checked; };
@@ -326,6 +341,7 @@ function lobby(){
     </div>
     ${allIn ? '' : `<div class="note"><a href="#" onclick="startDraft();return false" style="color:var(--dim)">someone can't get on? start anyway</a></div>`}
     <div class="note">Starting loads the real 32 survivors from the live feed (top-32 by rank as fallback).</div>
+    <div class="bar" style="margin-top:14px"><button class="danger-btn" onclick="restartLobby()">⟲ Restart from the beginning (everyone re-picks names)</button></div>
   </div>`;
 }
 

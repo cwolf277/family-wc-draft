@@ -108,6 +108,8 @@ const SB_KEY = "sb_publishable_PYS4EYHmBmSfzgkKJIhipg_hIDIQnyR";
 const sb = supabase.createClient(SB_URL, SB_KEY, { realtime:{ params:{ eventsPerSecond:10 } } });
 
 const PLAYERS = ["Grandad","Eric","Lesley","Chris","Molly","Finny","Ruby","Lukey"];
+// LOCKED final group-stage order (1st pick -> 8th). Decided, fixed.
+const LOCKED_ORDER = ["Eric","Lesley","Lukey","Grandad","Finny","Chris","Molly","Ruby"];
 const PCOLOR = {Grandad:"#16e0ff",Eric:"#4d8bff",Lesley:"#ff4d8d",Chris:"#9b6cff",Molly:"#ff9a3d",Finny:"#36e08f",Ruby:"#ff5cc8",Lukey:"#ffd23d"};
 const TEAMS=[
  ["New Zealand","nz",85],["Jordan","jo",63],["Iran","ir",20],["Netherlands","nl",8],
@@ -182,7 +184,7 @@ window.loadStandingsOrder = loadStandingsOrder;
 
 /* ============ state ============ */
 let me = localStorage.getItem("draftMe") || null;
-let state = null, picks = [], seedOrder = [], autopick = true;
+let state = null, picks = [], seedOrder = LOCKED_ORDER.slice(), autopick = true;
 let lastAuto = -1, prevMyTurn = false, online = {}, appliedReset = null;
 const myDelay = 1.5 + (Math.abs(hashStr((me||"")+Math.random())) % 16)/10;  // per-device backup jitter 1.5-3.1s
 function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return h; }
@@ -381,9 +383,9 @@ function lobby(){
             : `<div class="note">Waiting for <b>${waiting.join(', ')}</b> to select their name…</div>`}
     ${inProg ? '<div class="note" style="color:var(--cyan)">A draft is already running — it will open automatically.</div>' : ''}
 
-    <div class="sech" style="margin-top:18px">Draft order ${standingsOrder?'· auto-set from group standings':''}</div>
+    <div class="sech" style="margin-top:18px">Draft order · 🔒 final (locked from group standings)</div>
     <div class="seedbtns">${PLAYERS.map(p=>{ const n=seedOrder.indexOf(p); return `<button class="${n>=0?'done':''}" onclick="tapSeed('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${n>=0?`<span class="num">${n+1}</span>`:''}</button>`;}).join('')}</div>
-    <div class="note">${standingsErr?'⚠️ Couldn\'t load standings — tap players 1st → 8th, or ':(standingsOrder?'Pulled from the live group table (1st place picks first). Tap to override, or ':'Loading standings… or tap players 1st → 8th, or ')}<a href="#" onclick="loadStandingsOrder();return false" style="color:var(--cyan)">↻ reload from standings</a>${seedOrder.length?' · <a href="#" onclick="clearSeed();return false" style="color:var(--dim)">clear</a>':''}<br>${seedOrder.length===8?'<b>Order:</b> '+seedOrder.map((p,i)=>(i+1)+'. '+p).join('   '):seedOrder.length+'/8 set'}</div>
+    <div class="note"><b>Order:</b> ${seedOrder.length===8?seedOrder.map((p,i)=>(i+1)+'. '+p).join('   '):seedOrder.length+'/8 set'}<br>Locked from the final group table. Tap a player only if you ever need to change it.${seedOrder.length?' <a href="#" onclick="clearSeed();return false" style="color:var(--dim)">clear</a> · <a href="#" onclick="seedOrder=LOCKED_ORDER.slice();render();return false" style="color:var(--cyan)">reset to locked</a>':''}</div>
 
     <div class="bar" style="margin-top:16px">
       <span class="pill">⏱️ Clock <select id="secsSel"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select></span>
@@ -417,8 +419,7 @@ function setupChannel(){
 setupChannel();
 setInterval(refresh, 3000);          // polling safety net: self-heals any missed realtime event
 setInterval(()=>{ if(state && state.started && picks.length<(state.pool_json||[]).length) render(); }, 1000);  // clock tick
-refresh();
-loadStandingsOrder();                // seed the draft order from the live group standings
+refresh();                           // draft order is locked (LOCKED_ORDER); no live recompute
 </script>
 </body>
 </html>

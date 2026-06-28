@@ -153,9 +153,7 @@ async function refresh(){
       state = st;
       const rs = st.reset_seq||0;
       if(appliedReset===null) appliedReset = rs;                 // first sync: just record it
-      else if(rs!==appliedReset){                                // host hit "restart": everyone re-picks
-        appliedReset = rs; me=null; localStorage.removeItem("draftMe"); prevMyTurn=false; seedOrder=[];
-      }
+      else if(rs!==appliedReset){ appliedReset = rs; clearMe(); } // host hit "restart": everyone re-picks
     }
     if(pk) picks = pk;
     render();
@@ -223,12 +221,20 @@ async function resetDraft(){
   await sb.from('draft_state').update({ started:false, deadline:null }).eq('id',1);
   lastAuto=-1;
 }
+// clears this device's identity + presence and returns it to the name picker
+function clearMe(){
+  const old=me; me=null; localStorage.removeItem("draftMe"); seedOrder=[]; prevMyTurn=false;
+  if(old) online[old]=false;
+  try{ if(chan) chan.untrack(); }catch(e){}
+}
 // full restart: clears picks AND sends every device back to re-select their name
 async function restartLobby(){
   if(!confirm('Restart from the very beginning? This clears any picks and sends EVERYONE back to re-select their name.')) return;
+  const seq = Date.now();
   await sb.from('draft_picks').delete().neq('pick_no',-1);
-  await sb.from('draft_state').update({ started:false, deadline:null, reset_seq:Date.now() }).eq('id',1);
-  lastAuto=-1;
+  await sb.from('draft_state').update({ started:false, deadline:null, reset_seq:seq }).eq('id',1);
+  lastAuto=-1; appliedReset=seq;   // record so the echo doesn't double-handle
+  clearMe(); render();             // reset THIS (host) device instantly, don't wait on the broadcast
 }
 window.restartLobby = restartLobby;
 window.setMe = (p)=>{ me=p; if(p) localStorage.setItem("draftMe",p); else localStorage.removeItem("draftMe"); trackPresence(); render(); };

@@ -135,6 +135,51 @@ const rankOf = n => RANKc[key(n)] || 99;
 const TEST_POOL = TEAMS.slice().sort((a,b)=>a[2]-b[2]).slice(0,32).map(t=>({team:t[0],rank:t[2]}));
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=300";
 
+/* original group-stage rosters -> seed the draft order from final group standings */
+const ROSTERS={
+  Grandad:["New Zealand","Jordan","Iran","Netherlands","Brazil","England"],
+  Eric:["Australia","Norway","Bosnia","Colombia","France","Switzerland"],
+  Lesley:["Paraguay","Scotland","Ivory Coast","USA","Argentina","Mexico"],
+  Chris:["Saudi Arabia","Ghana","Uruguay","Ecuador","Spain","Turkey"],
+  Molly:["Uzbekistan","Haiti","Panama","Austria","Senegal","Egypt"],
+  Finny:["Iraq","Congo","Cape Verde","Germany","Japan","Portugal"],
+  Ruby:["Curacao","Czech Republic","Tunisia","Qatar","Canada","Korea"],
+  Lukey:["Sweden","Algeria","South Africa","Morocco","Croatia","Belgium"]
+};
+const OWNER={}; for(const p in ROSTERS) for(const t of ROSTERS[p]) OWNER[key(t)]=p;
+const ownerOf = n => OWNER[key(n)]||null;
+const ptsFor = (gf,ga)=> gf>ga?3 : gf===ga?2 : 1;
+function groupStandings(events){
+  const S={}; PLAYERS.forEach(p=>S[p]={pts:0,w:0,d:0,l:0,gf:0,ga:0});
+  const add=(s,p,gf,ga)=>{ s.pts+=p; s.gf+=gf; s.ga+=ga; if(gf>ga)s.w++; else if(gf===ga)s.d++; else s.l++; };
+  for(const e of events||[]){
+    if((e.season&&e.season.slug)!=='group-stage') continue;
+    if(((e.status||{}).type||{}).state!=='post') continue;          // finished only
+    const c=e.competitions[0].competitors;
+    const h=c.find(x=>x.homeAway==='home')||c[0], a=c.find(x=>x.homeAway==='away')||c[1];
+    const hs=+h.score, as=+a.score; if(isNaN(hs)||isNaN(as)) continue;
+    const ho=ownerOf(h.team.displayName), ao=ownerOf(a.team.displayName);
+    if(ho) add(S[ho],ptsFor(hs,as),hs,as);
+    if(ao) add(S[ao],ptsFor(as,hs),as,hs);
+  }
+  return S;
+}
+function rankPlayers(S){  // Points -> Goal Difference -> Goals For -> Wins (same as the main app)
+  return PLAYERS.slice().sort((a,b)=>
+    S[b].pts-S[a].pts || (S[b].gf-S[b].ga)-(S[a].gf-S[a].ga) || S[b].gf-S[a].gf || S[b].w-S[a].w || a.localeCompare(b));
+}
+let standingsOrder=null, standingsErr=false;
+async function loadStandingsOrder(){
+  try{
+    const j=await (await fetch(ESPN)).json();
+    standingsOrder = rankPlayers(groupStandings(j.events||[]));
+    standingsErr=false;
+    if(!state || !state.started) seedOrder = standingsOrder.slice();   // pre-fill the order in the lobby
+  }catch(e){ standingsErr=true; }
+  render();
+}
+window.loadStandingsOrder = loadStandingsOrder;
+
 /* ============ state ============ */
 let me = localStorage.getItem("draftMe") || null;
 let state = null, picks = [], seedOrder = [], autopick = true;
@@ -336,9 +381,9 @@ function lobby(){
             : `<div class="note">Waiting for <b>${waiting.join(', ')}</b> to select their name…</div>`}
     ${inProg ? '<div class="note" style="color:var(--cyan)">A draft is already running — it will open automatically.</div>' : ''}
 
-    <div class="sech" style="margin-top:18px">Draft order (tap players 1st → 8th)</div>
+    <div class="sech" style="margin-top:18px">Draft order ${standingsOrder?'· auto-set from group standings':''}</div>
     <div class="seedbtns">${PLAYERS.map(p=>{ const n=seedOrder.indexOf(p); return `<button class="${n>=0?'done':''}" onclick="tapSeed('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${n>=0?`<span class="num">${n+1}</span>`:''}</button>`;}).join('')}</div>
-    <div class="note">${seedOrder.length===8?'✅ Order set: '+seedOrder.join(' → '):'Leave blank to use the default order. '+seedOrder.length+'/8 set.'} ${seedOrder.length?'<a href="#" onclick="clearSeed();return false" style="color:var(--dim)">clear</a>':''}</div>
+    <div class="note">${standingsErr?'⚠️ Couldn\'t load standings — tap players 1st → 8th, or ':(standingsOrder?'Pulled from the live group table (1st place picks first). Tap to override, or ':'Loading standings… or tap players 1st → 8th, or ')}<a href="#" onclick="loadStandingsOrder();return false" style="color:var(--cyan)">↻ reload from standings</a>${seedOrder.length?' · <a href="#" onclick="clearSeed();return false" style="color:var(--dim)">clear</a>':''}<br>${seedOrder.length===8?'<b>Order:</b> '+seedOrder.map((p,i)=>(i+1)+'. '+p).join('   '):seedOrder.length+'/8 set'}</div>
 
     <div class="bar" style="margin-top:16px">
       <span class="pill">⏱️ Clock <select id="secsSel"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select></span>
@@ -373,6 +418,7 @@ setupChannel();
 setInterval(refresh, 3000);          // polling safety net: self-heals any missed realtime event
 setInterval(()=>{ if(state && state.started && picks.length<(state.pool_json||[]).length) render(); }, 1000);  // clock tick
 refresh();
+loadStandingsOrder();                // seed the draft order from the live group standings
 </script>
 </body>
 </html>

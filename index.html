@@ -34,6 +34,9 @@
 
   .names{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
   .names button{font-family:var(--head);text-transform:uppercase;letter-spacing:.4px;padding:13px;display:flex;align-items:center;gap:9px;justify-content:center}
+  .names button.taken{opacity:.55;border-style:dashed}
+  .inuse{font-family:'Noto Sans',sans-serif;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+       color:#36e08f;background:rgba(54,224,143,.14);border-radius:5px;padding:2px 5px;margin-left:4px}
   .pdot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor;display:inline-block}
 
   .clockwrap{display:flex;align-items:center;gap:14px;justify-content:center;margin:4px 0 6px}
@@ -207,6 +210,10 @@ async function resetDraft(){
   lastAuto=-1;
 }
 window.setMe = (p)=>{ me=p; if(p) localStorage.setItem("draftMe",p); else localStorage.removeItem("draftMe"); trackPresence(); render(); };
+window.selectName = (p)=>{
+  if(online[p] && p!==me){ if(!confirm(p+" is already selected on another device. Take over and become "+p+"?")) return; }
+  setMe(p);
+};
 window.tapSeed = (p)=>{ const i=seedOrder.indexOf(p); if(i>=0) seedOrder.splice(i,1); else if(seedOrder.length<8) seedOrder.push(p); render(); };
 window.clearSeed = ()=>{ seedOrder=[]; render(); };
 
@@ -281,9 +288,11 @@ function render(){
 function onlineList(){ return PLAYERS.filter(p=>online[p]); }
 function namePicker(){
   return `<div class="card center">
-    <div class="sech" style="color:var(--txt)">Who are you?</div>
-    <div class="names">${PLAYERS.map(p=>`<button onclick="setMe('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${online[p]?' 🟢':''}</button>`).join('')}</div>
-    <div class="note">Tap your name to join. 🟢 means already connected on another device.</div>
+    <div class="sech" style="color:var(--txt)">Select your name</div>
+    <div class="names">${PLAYERS.map(p=>{ const taken=online[p];
+      return `<button class="${taken?'taken':''}" onclick="selectName('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${taken?'<span class="inuse">in use</span>':''}</button>`;
+    }).join('')}</div>
+    <div class="note">Tap your name to select it. It's remembered on your device. Names marked <b style="color:#36e08f">in use</b> are already selected by someone.</div>
   </div>`;
 }
 function lobby(){

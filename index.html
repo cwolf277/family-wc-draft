@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Family World Cup · Live Snake Draft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800;900&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#080b1a; --panel:#121833; --panel2:#1a2348; --line:#2a3566;
+    --txt:#eef1ff; --dim:#97a0c6; --blue:#3d7bff; --purple:#8b5cf6; --pink:#ff3d77; --cyan:#1fe0ff;
+    --grad:linear-gradient(90deg,#1fe0ff,#3d7bff,#8b5cf6,#ff3d77);
+    --head:'Archivo',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Noto Sans',-apple-system,sans-serif;color:var(--txt);min-height:100vh;background:#070a16}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+       background:radial-gradient(900px 480px at 12% 0%,rgba(31,224,255,.16),transparent 55%),
+                  radial-gradient(900px 480px at 88% 2%,rgba(255,61,119,.16),transparent 55%),
+                  radial-gradient(900px 620px at 50% 100%,rgba(139,92,246,.15),transparent 60%)}
+  img.flag{height:15px;border-radius:2px;vertical-align:-2px;box-shadow:0 0 0 1px rgba(0,0,0,.45);background:#222}
+  .wrap{max-width:780px;margin:0 auto;padding:16px 13px 60px}
+  h1{font-family:var(--head);font-weight:800;font-size:1.5rem;text-transform:uppercase;letter-spacing:.5px;text-align:center;margin:6px 0 2px}
+  h1 .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{text-align:center;color:var(--dim);font-size:.85rem;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  button{cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--txt);padding:9px 15px;border-radius:10px;font-size:.9rem;font-family:'Noto Sans',sans-serif}
+  button.primary{background:var(--grad);border-color:transparent;color:#fff;font-weight:700;font-family:var(--head);letter-spacing:.4px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .card{background:linear-gradient(180deg,var(--panel),rgba(10,14,33,.7));border:1px solid var(--line);border-radius:14px;border-bottom-left-radius:22px;padding:16px;margin-bottom:14px}
+  .center{text-align:center}
+
+  .names{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+  .names button{font-family:var(--head);text-transform:uppercase;letter-spacing:.4px;padding:13px;display:flex;align-items:center;gap:9px;justify-content:center}
+  .pdot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor;display:inline-block}
+
+  .clockwrap{display:flex;align-items:center;gap:14px;justify-content:center;margin:4px 0 6px}
+  .clock{font-family:var(--head);font-weight:800;font-size:2.7rem;line-height:1;letter-spacing:1px;min-width:130px;text-align:center}
+  .clock.warn{color:#ffd23d} .clock.danger{color:var(--pink);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.4}}
+  .onclock{text-align:center;font-family:var(--head);font-size:1.05rem;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+  .yourturn{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800;font-size:1.35rem;animation:pulse 1.3s infinite}
+  .roundlbl{text-align:center;color:var(--dim);font-size:.78rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+  .order{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin:6px 0 2px}
+  .seat{font-size:.66rem;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--dim);display:flex;align-items:center;gap:4px}
+  .seat.on{border-color:var(--cyan);color:#fff;box-shadow:0 0 10px rgba(31,224,255,.3)}
+  .seat .d{width:7px;height:7px;border-radius:50%}
+  .seat.off{opacity:.45}
+
+  .sech{font-family:var(--head);font-size:.82rem;text-transform:uppercase;letter-spacing:1.4px;color:var(--cyan);margin:16px 0 9px;font-weight:600}
+  .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .team{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:.9rem;transition:.12s}
+  .team .rk{margin-left:auto;font-size:.62rem;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .team.pick{cursor:pointer}
+  .team.pick:hover{border-color:var(--cyan);transform:translateY(-1px);background:var(--panel2)}
+  .team.dim{opacity:.35}
+
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}
+  .pcard{background:linear-gradient(180deg,var(--panel),rgba(10,14,33,.65));border:1px solid var(--line);border-radius:11px;border-bottom-left-radius:20px;padding:11px 12px}
+  .pcard.on{border-color:var(--cyan);box-shadow:0 0 16px rgba(31,224,255,.25)}
+  .pcard.me{box-shadow:0 0 0 1.5px var(--blue) inset}
+  .pcard h4{margin:0 0 8px;font-family:var(--head);font-weight:600;font-size:1rem;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:7px}
+  .pcard h4 .liveon{width:7px;height:7px;border-radius:50%;background:#36e08f;margin-left:auto;box-shadow:0 0 6px #36e08f}
+  .pcard .slot{display:flex;align-items:center;gap:7px;font-size:.84rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);min-height:26px}
+  .pcard .slot.empty{color:var(--dim);font-style:italic;opacity:.6}
+  .pcard .slot:last-child{border-bottom:none}
+
+  .bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+  .toggle{display:flex;align-items:center;gap:7px;font-size:.84rem;color:var(--dim);justify-content:center;margin-top:10px}
+  .pill{display:inline-flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:.82rem}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:.85rem}
+  .note{font-size:.74rem;color:var(--dim);text-align:center;margin-top:12px;line-height:1.55}
+  .live{font-size:.74rem;text-align:center;margin-bottom:8px;letter-spacing:.5px}
+  .live.ok{color:#36e08f} .live.bad{color:var(--pink)}
+  .seedbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+  .seedbtns button{display:flex;align-items:center;gap:8px;justify-content:flex-start;font-family:var(--head);text-transform:uppercase;font-size:.85rem;letter-spacing:.3px}
+  .seedbtns button .num{margin-left:auto;font-family:var(--head);font-weight:800;color:var(--cyan)}
+  .seedbtns button.done{opacity:.55}
+  .danger-btn{border-color:#5a2740;color:#ff7a98;background:rgba(255,61,119,.08)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐍 Snake Draft <span class="g">Round of 32</span></h1>
+  <div class="sub">Live · everyone drafts on their own phone</div>
+  <div class="live" id="liveStatus">connecting…</div>
+  <div id="app"></div>
+  <div class="note" id="footnote"></div>
+</div>
+
+<script>
+/* ============ config + data ============ */
+const SB_URL = "https://fzqujoryxipzrnzagxsd.supabase.co";
+const SB_KEY = "sb_publishable_PYS4EYHmBmSfzgkKJIhipg_hIDIQnyR";
+const sb = supabase.createClient(SB_URL, SB_KEY, { realtime:{ params:{ eventsPerSecond:10 } } });
+
+const PLAYERS = ["Grandad","Eric","Lesley","Chris","Molly","Finny","Ruby","Lukey"];
+const PCOLOR = {Grandad:"#16e0ff",Eric:"#4d8bff",Lesley:"#ff4d8d",Chris:"#9b6cff",Molly:"#ff9a3d",Finny:"#36e08f",Ruby:"#ff5cc8",Lukey:"#ffd23d"};
+const TEAMS=[
+ ["New Zealand","nz",85],["Jordan","jo",63],["Iran","ir",20],["Netherlands","nl",8],
+ ["Brazil","br",6],["England","gb-eng",4],["Australia","au",27],["Norway","no",31],
+ ["Bosnia","ba",64],["Colombia","co",13],["France","fr",3],["Switzerland","ch",19],
+ ["Paraguay","py",41],["Scotland","gb-sct",42],["Ivory Coast","ci",33],["USA","us",17],
+ ["Argentina","ar",1],["Mexico","mx",14],["Saudi Arabia","sa",61],["Ghana","gh",73],
+ ["Uruguay","uy",16],["Ecuador","ec",23],["Spain","es",2],["Turkey","tr",22],
+ ["Uzbekistan","uz",50],["Haiti","ht",83],["Panama","pa",34],["Austria","at",24],
+ ["Senegal","sn",15],["Egypt","eg",29],["Iraq","iq",57],["Congo","cd",46],
+ ["Cape Verde","cv",67],["Germany","de",10],["Japan","jp",18],["Portugal","pt",5],
+ ["Curacao","cw",82],["Czech Republic","cz",40],["Tunisia","tn",45],["Qatar","qa",56],
+ ["Canada","ca",30],["Korea","kr",25],["Sweden","se",38],["Algeria","dz",28],
+ ["South Africa","za",60],["Morocco","ma",7],["Croatia","hr",11],["Belgium","be",9]
+];
+const ALIAS={"south korea":"korea","korea republic":"korea","united states":"usa","turkiye":"turkey",
+ "cote divoire":"ivory coast","bosnia and herzegovina":"bosnia","bosnia herzegovina":"bosnia",
+ "dr congo":"congo","congo dr":"congo","cabo verde":"cape verde","czechia":"czech republic","ir iran":"iran"};
+function key(n){ if(!n) return ""; let s=n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")
+  .replace(/[.'’]/g,"").replace(/-/g," ").replace(/\s+/g," ").trim(); return ALIAS[s]||s; }
+const ISOc={}, RANKc={}, DISPc={};
+TEAMS.forEach(([n,iso,r])=>{ const k=key(n); ISOc[k]=iso; RANKc[k]=r; DISPc[k]=n; });
+const flag = n => ISOc[key(n)] ? `<img class="flag" src="https://flagcdn.com/w40/${ISOc[key(n)]}.png" alt="">` : '';
+const rankOf = n => RANKc[key(n)] || 99;
+const TEST_POOL = TEAMS.slice().sort((a,b)=>a[2]-b[2]).slice(0,32).map(t=>({team:t[0],rank:t[2]}));
+const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=300";
+
+/* ============ state ============ */
+let me = localStorage.getItem("draftMe") || null;
+let state = null, picks = [], seedOrder = [], autopick = true;
+let lastAuto = -1, prevMyTurn = false, online = {};
+const myDelay = 1.5 + (Math.abs(hashStr((me||"")+Math.random())) % 16)/10;  // per-device backup jitter 1.5-3.1s
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return h; }
+
+/* ============ data sync (realtime + polling safety net) ============ */
+async function refresh(){
+  try{
+    const [{data:st}, {data:pk}] = await Promise.all([
+      sb.from('draft_state').select('*').eq('id',1).single(),
+      sb.from('draft_picks').select('*').order('pick_no')
+    ]);
+    if(st) state = st;
+    if(pk) picks = pk;
+    render();
+  }catch(e){ /* keep last known; poll will retry */ }
+}
+
+/* ============ picking ============ */
+async function doPick(no, player, team){
+  // primary-key on pick_no + unique on team make this safe under concurrency: first writer wins
+  const { error } = await sb.from('draft_picks').insert({ pick_no:no, player, team });
+  if(error) return false;                    // someone beat us; realtime/poll will correct
+  const secs = (state && state.pick_seconds) || 60;
+  await sb.from('draft_state').update({ deadline:new Date(Date.now()+secs*1000).toISOString() }).eq('id',1);
+  return true;
+}
+function pickerFor(no, order){ const rnd=Math.floor(no/8), pos=no%8; return rnd%2===0 ? order[pos] : order[7-pos]; }
+async function makePick(team){
+  if(!state || !state.started) return;
+  const no = picks.length; if(no>=32) return;
+  if(pickerFor(no, state.order_json) !== me) return;       // only the on-clock player may tap-pick
+  if(picks.some(p=>p.team===team)) return;
+  await doPick(no, me, team);
+}
+/* auto-pick: ANY open device may fire it once the clock expires, so a sleeping phone never stalls the draft.
+   The on-clock device acts instantly; others wait a short staggered backup delay; the DB dedupes. */
+function maybeAutoPick(no, onClock, pool, taken){
+  if(!autopick || lastAuto===no || !state.deadline) return;
+  const past = (Date.now() - new Date(state.deadline).getTime())/1000;
+  if(past < 0) return;
+  const delay = (onClock===me) ? 0 : myDelay;
+  if(past < delay) return;
+  lastAuto = no;
+  const best = pool.filter(t=>!taken.has(t.team)).sort((a,b)=>a.rank-b.rank)[0];
+  if(best) doPick(no, onClock, best.team);
+}
+
+/* ============ host actions ============ */
+async function startDraft(){
+  const secs = parseInt(document.getElementById('secsSel').value);
+  const order = (seedOrder.length===8) ? seedOrder.slice() : PLAYERS.slice();
+  let pool = TEST_POOL, usedReal=false;
+  try{
+    const j = await (await fetch(ESPN)).json();
+    const m = new Map();
+    for(const e of (j.events||[])){
+      if((e.season&&e.season.slug)==='round-of-32'){
+        for(const c of e.competitions[0].competitors){
+          const k=key(c.team.displayName);
+          if(DISPc[k]) m.set(DISPc[k], { team:DISPc[k], rank:RANKc[k] });
+        }
+      }
+    }
+    if(m.size===32){ pool=[...m.values()]; usedReal=true; }
+  }catch(e){}
+  await sb.from('draft_state').update({
+    order_json:order, pool_json:pool, started:true,
+    pick_seconds:secs, deadline:new Date(Date.now()+secs*1000).toISOString()
+  }).eq('id',1);
+  if(!usedReal) setTimeout(()=>alert("Heads up: the 32 real survivors weren't all set in the feed yet, so this round is using the top-32 by FIFA rank. Re-start once the Round of 32 is locked to load the real teams."), 300);
+}
+async function resetDraft(){
+  const c = prompt('This wipes the entire draft for everyone. Type RESET to confirm.');
+  if(c!=='RESET') return;
+  await sb.from('draft_picks').delete().neq('pick_no',-1);
+  await sb.from('draft_state').update({ started:false, deadline:null }).eq('id',1);
+  lastAuto=-1;
+}
+window.setMe = (p)=>{ me=p; if(p) localStorage.setItem("draftMe",p); else localStorage.removeItem("draftMe"); trackPresence(); render(); };
+window.tapSeed = (p)=>{ const i=seedOrder.indexOf(p); if(i>=0) seedOrder.splice(i,1); else if(seedOrder.length<8) seedOrder.push(p); render(); };
+window.clearSeed = ()=>{ seedOrder=[]; render(); };
+
+/* ============ alerts ============ */
+function alertMyTurn(){
+  try{ if(navigator.vibrate) navigator.vibrate([220,90,220]); }catch(e){}
+  try{ const a=new (window.AudioContext||window.webkitAudioContext)(); const o=a.createOscillator(),g=a.createGain();
+       o.connect(g);g.connect(a.destination);o.type='sine';o.frequency.value=880;g.gain.value=.08;
+       o.start();o.frequency.setValueAtTime(1320,a.currentTime+.12);o.stop(a.currentTime+.24); }catch(e){}
+}
+
+/* ============ render ============ */
+function render(){
+  const app = document.getElementById('app');
+  const fn = document.getElementById('footnote');
+  fn.innerHTML = me ? `You are <b style="color:${PCOLOR[me]||'#fff'}">${me||''}</b> · <a href="#" onclick="setMe(null);return false" style="color:var(--dim)">change name</a>` : '';
+  if(!me){ app.innerHTML = namePicker(); return; }
+  if(!state || !state.started){ app.innerHTML = lobby(); return; }
+
+  const order = state.order_json, pool = state.pool_json || [];
+  const taken = new Set(picks.map(p=>p.team));
+  const no = picks.length, done = no>=Math.min(32, pool.length);
+  const onClock = done ? null : pickerFor(no, order);
+  const myTurn = onClock===me;
+
+  if(myTurn && !prevMyTurn) alertMyTurn();
+  prevMyTurn = myTurn;
+
+  let secLeft = 0;
+  if(state.deadline && !done) secLeft = Math.max(0, Math.round((new Date(state.deadline).getTime()-Date.now())/1000));
+  const mm=Math.floor(secLeft/60), ss=String(secLeft%60).padStart(2,'0');
+  const clockCls = secLeft<=5?'danger':secLeft<=10?'warn':'';
+  const round=Math.floor(no/8)+1, totalRounds=Math.ceil(pool.length/8);
+
+  if(!done) maybeAutoPick(no, onClock, pool, taken);
+
+  app.innerHTML = `
+  <div class="card">
+    ${done ? `<div class="onclock" style="color:#36e08f">✅ Draft complete — all squads locked!</div>`
+      : `<div class="clockwrap"><div class="clock ${clockCls}">${mm}:${ss}</div></div>
+         <div class="onclock">${myTurn?`<span class="yourturn">🎯 YOUR PICK</span>`:`<span class="pdot" style="background:${PCOLOR[onClock]};color:${PCOLOR[onClock]}"></span> ${onClock} is on the clock`}</div>
+         <div class="roundlbl">Round ${round} of ${totalRounds} · Pick ${no+1} of ${pool.length}${secLeft===0?' · ⏰ time up, auto-picking…':''}</div>`}
+    <div class="order">${order.map((p,i)=>`<span class="seat ${p===onClock?'on':''} ${online[p]?'':'off'}"><span class="d" style="background:${PCOLOR[p]}"></span>${i+1}. ${p}${online[p]?'':' ·zzz'}</span>`).join('')}</div>
+  </div>
+
+  ${done?'':`<div class="sech">${myTurn?'🎯 Pick your team':'Available ('+(pool.length-no)+' left)'}</div>
+  <div class="pool">
+    ${pool.slice().sort((a,b)=>a.rank-b.rank).map(t=>{
+      const isTaken=taken.has(t.team);
+      return `<div class="team ${myTurn&&!isTaken?'pick':''} ${isTaken?'dim':''}" data-team="${isTaken?'':t.team}">
+        ${flag(t.team)} <span>${t.team}</span><span class="rk">#${t.rank}</span></div>`;
+    }).join('')}
+  </div>`}
+
+  <div class="sech">The Board</div>
+  <div class="board">${order.map(p=>{
+    const mine=picks.filter(x=>x.player===p).sort((a,b)=>a.pick_no-b.pick_no);
+    const slots=[0,1,2,3].map(i=> mine[i]
+      ? `<div class="slot">${flag(mine[i].team)} ${mine[i].team}</div>`
+      : `<div class="slot empty">— pick ${i+1} —</div>`).join('');
+    return `<div class="pcard ${p===onClock?'on':''} ${p===me?'me':''}">
+      <h4><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${online[p]?'<span class="liveon" title="online"></span>':''}</h4>${slots}</div>`;
+  }).join('')}</div>
+
+  <div class="toggle"><label><input type="checkbox" id="apToggle" ${autopick?'checked':''}> Auto-pick the best available team if the clock runs out</label></div>
+  <div class="bar"><button class="danger-btn" onclick="resetDraft()">↺ Reset draft</button></div>`;
+
+  if(myTurn) app.querySelectorAll('.team.pick').forEach(el=>{ const t=el.dataset.team; if(t) el.onclick=()=>makePick(t); });
+  const ap=document.getElementById('apToggle'); if(ap) ap.onchange=()=>{ autopick=ap.checked; };
+}
+
+function onlineList(){ return PLAYERS.filter(p=>online[p]); }
+function namePicker(){
+  return `<div class="card center">
+    <div class="sech" style="color:var(--txt)">Who are you?</div>
+    <div class="names">${PLAYERS.map(p=>`<button onclick="setMe('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${online[p]?' 🟢':''}</button>`).join('')}</div>
+    <div class="note">Tap your name to join. 🟢 means already connected on another device.</div>
+  </div>`;
+}
+function lobby(){
+  const inProg = picks.length>0;
+  const seatList = (seedOrder.length? seedOrder : PLAYERS);
+  return `<div class="card center">
+    <div class="onclock">👋 You're in as <b style="color:${PCOLOR[me]}">${me}</b></div>
+    <div class="roundlbl">${onlineList().length} of 8 connected · ${inProg?'a draft is already running':'lobby'}</div>
+    <div class="order">${PLAYERS.map(p=>`<span class="seat ${online[p]?'on':'off'}"><span class="d" style="background:${PCOLOR[p]}"></span>${p}</span>`).join('')}</div>
+
+    <div class="sech" style="margin-top:18px">Draft order (tap players 1st → 8th)</div>
+    <div class="seedbtns">${PLAYERS.map(p=>{ const n=seedOrder.indexOf(p); return `<button class="${n>=0?'done':''}" onclick="tapSeed('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${n>=0?`<span class="num">${n+1}</span>`:''}</button>`;}).join('')}</div>
+    <div class="note">${seedOrder.length===8?'✅ Order set: '+seedOrder.join(' → '):'Leave blank to use the default order. '+seedOrder.length+'/8 set.'} ${seedOrder.length?'<a href="#" onclick="clearSeed();return false" style="color:var(--dim)">clear</a>':''}</div>
+
+    <div class="bar" style="margin-top:16px">
+      <span class="pill">⏱️ Clock <select id="secsSel"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select></span>
+      <button class="primary" onclick="startDraft()">▶ Start the Draft</button>
+    </div>
+    <div class="note">Starting loads the real 32 survivors from the live feed (falls back to top-32 by rank if they aren't all set yet). Anyone can start it.</div>
+  </div>`;
+}
+
+/* ============ realtime + presence + polling ============ */
+let chan;
+function trackPresence(){ if(chan && me) chan.track({ name:me, at:Date.now() }); }
+function setupChannel(){
+  chan = sb.channel('draft-room', { config:{ presence:{ key: (me||'spectator')+'-'+Math.random().toString(36).slice(2,7) } } })
+    .on('postgres_changes', {event:'*', schema:'public', table:'draft_picks'}, refresh)
+    .on('postgres_changes', {event:'*', schema:'public', table:'draft_state'}, refresh)
+    .on('presence', {event:'sync'}, ()=>{
+      online = {}; const st=chan.presenceState();
+      Object.values(st).forEach(arr=>arr.forEach(p=>{ if(p.name) online[p.name]=true; }));
+      render();
+    })
+    .subscribe((status)=>{
+      const el=document.getElementById('liveStatus');
+      if(status==='SUBSCRIBED'){ el.textContent='🟢 live · synced across all devices'; el.className='live ok'; trackPresence(); }
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){ el.textContent='reconnecting…'; el.className='live bad'; }
+    });
+}
+setupChannel();
+setInterval(refresh, 3000);          // polling safety net: self-heals any missed realtime event
+setInterval(()=>{ if(state && state.started && picks.length<(state.pool_json||[]).length) render(); }, 1000);  // clock tick
+refresh();
+</script>
+</body>
+</html>

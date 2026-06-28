@@ -52,6 +52,13 @@
   .seat.on{border-color:var(--cyan);color:#fff;box-shadow:0 0 10px rgba(31,224,255,.3)}
   .seat .d{width:7px;height:7px;border-radius:50%}
   .seat.off{opacity:.45}
+  .lobgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0}
+  .seat2{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);font-family:var(--head);font-size:.88rem;text-transform:uppercase;letter-spacing:.3px}
+  .seat2 .d{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .seat2.inroom{border-color:rgba(54,224,143,.5)}
+  .seat2.wait{opacity:.5;border-style:dashed}
+  .seat2 .rdy{margin-left:auto;color:#36e08f;font-size:.66rem}
+  .seat2 .wt{margin-left:auto;color:var(--dim);font-size:.64rem;font-style:italic;font-family:'Noto Sans',sans-serif;text-transform:none}
 
   .sech{font-family:var(--head);font-size:.82rem;text-transform:uppercase;letter-spacing:1.4px;color:var(--cyan);margin:16px 0 9px;font-weight:600}
   .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -297,11 +304,16 @@ function namePicker(){
 }
 function lobby(){
   const inProg = picks.length>0;
-  const seatList = (seedOrder.length? seedOrder : PLAYERS);
+  const inCount = onlineList().length;
+  const waiting = PLAYERS.filter(p=>!online[p]);
+  const allIn = inCount>=8;
   return `<div class="card center">
     <div class="onclock">👋 You're in as <b style="color:${PCOLOR[me]}">${me}</b></div>
-    <div class="roundlbl">${onlineList().length} of 8 connected · ${inProg?'a draft is already running':'lobby'}</div>
-    <div class="order">${PLAYERS.map(p=>`<span class="seat ${online[p]?'on':'off'}"><span class="d" style="background:${PCOLOR[p]}"></span>${p}</span>`).join('')}</div>
+    <div class="sech" style="margin-top:6px;color:var(--txt)">Waiting Room · ${inCount}/8 selected</div>
+    <div class="lobgrid">${PLAYERS.map(p=>`<span class="seat2 ${online[p]?'inroom':'wait'}"><span class="d" style="background:${PCOLOR[p]}"></span>${p}${online[p]?'<b class="rdy">✓ in</b>':'<span class="wt">waiting…</span>'}</span>`).join('')}</div>
+    ${allIn ? '<div class="note" style="color:#36e08f">🎉 Everyone is here — ready to draft!</div>'
+            : `<div class="note">Waiting for <b>${waiting.join(', ')}</b> to select their name…</div>`}
+    ${inProg ? '<div class="note" style="color:var(--cyan)">A draft is already running — it will open automatically.</div>' : ''}
 
     <div class="sech" style="margin-top:18px">Draft order (tap players 1st → 8th)</div>
     <div class="seedbtns">${PLAYERS.map(p=>{ const n=seedOrder.indexOf(p); return `<button class="${n>=0?'done':''}" onclick="tapSeed('${p}')"><span class="pdot" style="background:${PCOLOR[p]};color:${PCOLOR[p]}"></span>${p}${n>=0?`<span class="num">${n+1}</span>`:''}</button>`;}).join('')}</div>
@@ -309,9 +321,11 @@ function lobby(){
 
     <div class="bar" style="margin-top:16px">
       <span class="pill">⏱️ Clock <select id="secsSel"><option value="30">30s</option><option value="60" selected>60s</option><option value="90">90s</option></select></span>
-      <button class="primary" onclick="startDraft()">▶ Start the Draft</button>
+      ${allIn ? `<button class="primary" onclick="startDraft()">▶ Start the Draft</button>`
+              : `<button class="primary" disabled>⏳ Waiting for everyone (${inCount}/8)</button>`}
     </div>
-    <div class="note">Starting loads the real 32 survivors from the live feed (falls back to top-32 by rank if they aren't all set yet). Anyone can start it.</div>
+    ${allIn ? '' : `<div class="note"><a href="#" onclick="startDraft();return false" style="color:var(--dim)">someone can't get on? start anyway</a></div>`}
+    <div class="note">Starting loads the real 32 survivors from the live feed (top-32 by rank as fallback).</div>
   </div>`;
 }
 

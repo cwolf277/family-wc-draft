@@ -63,11 +63,30 @@
   .sech{font-family:var(--head);font-size:.82rem;text-transform:uppercase;letter-spacing:1.4px;color:var(--cyan);margin:16px 0 9px;font-weight:600}
   .pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:8px}
   .team{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:.9rem;transition:.12s}
-  .t-top{display:flex;align-items:center;gap:8px}
+  .t-top{display:flex;align-items:center;gap:7px}
   .t-nm{font-weight:600}
-  .t-top .rk{margin-left:auto;font-size:.62rem;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .t-info{margin-left:auto;width:21px;height:21px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--cyan);font-size:.72rem;font-weight:800;font-style:italic;font-family:var(--head);cursor:pointer;padding:0}
+  .t-info:hover,.t-info:active{background:var(--cyan);color:#04121a}
+  .t-top .rk{font-size:.62rem;font-weight:700;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
   .t-star{font-size:.74rem;color:#ffd23d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .t-form{font-size:.68rem;color:var(--dim)}
+  /* team scouting modal */
+  .tm-overlay{position:fixed;inset:0;background:rgba(3,6,18,.78);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+  .tm-overlay.show{display:flex}
+  .tm-card{background:linear-gradient(180deg,var(--panel),var(--bg));border:1px solid var(--line);border-radius:16px;padding:20px;max-width:360px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .tm-x{position:absolute;top:10px;right:14px;background:none;border:none;color:var(--dim);font-size:1.2rem;cursor:pointer;line-height:1}
+  .tm-top{display:flex;align-items:center;gap:10px;font-family:var(--head);font-weight:800;font-size:1.3rem}
+  .tm-rank{font-size:.72rem;color:var(--dim);margin:4px 0 13px;text-transform:uppercase;letter-spacing:.5px}
+  .tm-rate{display:flex;align-items:center;gap:10px;font-family:var(--head);font-size:1.05rem}
+  .tm-stars{font-size:1.2rem;letter-spacing:2px;color:#ffd23d}
+  .tm-note{font-size:.9rem;color:var(--cyan);margin:7px 0 4px}
+  .tm-row{display:flex;justify-content:space-between;font-size:.9rem;padding:10px 0;border-top:1px solid var(--line);margin-top:12px}
+  .tm-sec{font-family:var(--head);font-size:.72rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin:15px 0 9px}
+  .tm-stat{display:flex;gap:10px}
+  .tm-stat>div{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .tm-k{display:block;font-size:.64rem;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .tm-stat b{font-family:var(--head);font-size:1.05rem}
+  .tm-desc{font-size:.88rem;color:var(--txt);margin-top:12px;line-height:1.5}
   .team.pick{cursor:pointer}
   .team.pick:hover{border-color:var(--cyan);transform:translateY(-1px);background:var(--panel2)}
   .team.dim{opacity:.35}
@@ -104,6 +123,7 @@
   <div id="app"></div>
   <div class="note" id="footnote"></div>
 </div>
+<div id="teamModal" class="tm-overlay" onclick="closeTeamInfo()"></div>
 
 <script>
 /* ============ config + data ============ */
@@ -175,6 +195,42 @@ function computeTeamForm(events){
 async function loadTeamData(){
   try{ const j=await (await fetch(ESPN)).json(); teamForm=computeTeamForm(j.events||[]); render(); }catch(e){}
 }
+/* scouting report: how good a team is, by FIFA rank + how the group stage actually went */
+function ratingFor(rank){
+  if(rank<=4)  return {stars:5,tier:'Elite',     note:'Genuine title contender.'};
+  if(rank<=10) return {stars:4,tier:'Excellent', note:'A real threat to go deep.'};
+  if(rank<=18) return {stars:3,tier:'Good',      note:'Capable of a knockout run.'};
+  if(rank<=30) return {stars:2,tier:'Decent',    note:'Could spring a surprise.'};
+  return            {stars:1,tier:'Underdog',  note:'Up against it, but anything can happen.'};
+}
+function formDesc(f){
+  if(!f) return 'Group results loading…';
+  const gd=f.gf-f.ga;
+  if(f.w===3)        return `Perfect group stage, won all three (${f.gf} scored, ${f.ga} conceded). Looked the part.`;
+  if(f.l===0)        return `Unbeaten in the group (${f.w}W ${f.d}D, ${f.gf}-${f.ga}). Came through comfortably.`;
+  if(f.w>=2)         return `Strong group: ${f.w} wins (${f.gf}-${f.ga}, ${gd>=0?'+':''}${gd}). One slip, but plenty of quality.`;
+  if(f.w===1)        return `Got through the hard way (${f.w}W ${f.d}D ${f.l}L, ${f.gf}-${f.ga}). Beatable.`;
+  return                  `Scraped through (${f.w}W ${f.d}D ${f.l}L, ${f.gf}-${f.ga}). Looked wobbly.`;
+}
+function teamInfo(team){
+  const r=rankOf(team), rt=ratingFor(r), f=teamForm[team], gd=f?f.gf-f.ga:0;
+  const stars='★'.repeat(rt.stars)+`<span style="color:#3a4366">${'★'.repeat(5-rt.stars)}</span>`;
+  const m=document.getElementById('teamModal'); if(!m) return;
+  m.innerHTML=`<div class="tm-card" onclick="event.stopPropagation()">
+    <button class="tm-x" onclick="closeTeamInfo()">✕</button>
+    <div class="tm-top">${flag(team)} ${team}</div>
+    <div class="tm-rank">FIFA World Ranking · #${r}</div>
+    <div class="tm-rate"><span class="tm-stars">${stars}</span><span>${rt.tier}</span></div>
+    <div class="tm-note">${rt.note}</div>
+    <div class="tm-row"><span>⭐ Star player</span><b>${starOf(team)||'—'}</b></div>
+    <div class="tm-sec">Group stage</div>
+    ${f?`<div class="tm-stat"><div><span class="tm-k">Record</span><b>${f.w}W ${f.d}D ${f.l}L</b></div><div><span class="tm-k">Goals</span><b>${f.gf}-${f.ga} (${gd>=0?'+':''}${gd})</b></div></div>`:''}
+    <div class="tm-desc">${formDesc(f)}</div>
+  </div>`;
+  m.classList.add('show');
+}
+window.teamInfo=teamInfo;
+window.closeTeamInfo=()=>{ const m=document.getElementById('teamModal'); if(m) m.classList.remove('show'); };
 const TEST_POOL = TEAMS.slice().sort((a,b)=>a[2]-b[2]).slice(0,32).map(t=>({team:t[0],rank:t[2]}));
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=20260611-20260719&limit=300";
 
@@ -382,7 +438,7 @@ function render(){
       const f=teamForm[t.team];
       const form = f ? `Group ${f.w}W ${f.d}D ${f.l}L · ${f.gf}-${f.ga}` : '';
       return `<div class="team ${myTurn&&!isTaken?'pick':''} ${isTaken?'dim':''}" data-team="${isTaken?'':t.team}">
-        <div class="t-top">${flag(t.team)} <span class="t-nm">${t.team}</span><span class="rk">#${t.rank}</span></div>
+        <div class="t-top">${flag(t.team)} <span class="t-nm">${t.team}</span><button class="t-info" onclick="event.stopPropagation();teamInfo('${t.team}')" title="Scouting report">i</button><span class="rk">#${t.rank}</span></div>
         <div class="t-star">⭐ ${starOf(t.team)||'—'}</div>
         <div class="t-form">${form}</div>
       </div>`;
